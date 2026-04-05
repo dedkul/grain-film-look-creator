@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAIN — Film Look Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:wght@400;700&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #f2ead8;
+    --paper: #e8dfc8;
+    --tan: #c9b99a;
+    --brown: #7a5c3e;
+    --dark: #1a1410;
+    --darkest: #0d0a07;
+    --red: #c0392b;
+    --orange: #d4622a;
+    --ink: #2c1f14;
+    --dust: rgba(201,185,154,0.15);
+  }
+
+  body {
+    background: var(--darkest);
+    color: var(--cream);
+    font-family: 'Courier Prime', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.6;
+  }
+
+  /* Header */
+  header {
+    border-bottom: 1px solid var(--brown);
+    padding: 18px 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    background: linear-gradient(180deg, #120e0a 0%, transparent 100%);
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--cream);
+  }
+
+  .logo span {
+    color: var(--orange);
+  }
+
+  .tagline {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--tan);
+    opacity: 0.7;
+    padding-bottom: 2px;
+  }
+
+  /* Main layout */
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    border-right: 1px solid rgba(122,92,62,0.4);
+    padding: 28px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: linear-gradient(180deg, #150f0a 0%, #0d0a07 100%);
+  }
+
+  .sidebar-section {
+    padding: 0 24px 24px;
+    border-bottom: 1px solid rgba(122,92,62,0.2);
+    margin-bottom: 0;
+  }
+
+  .section-label {
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--tan);
+    opacity: 0.5;
+    margin-bottom: 14px;
+    padding-top: 24px;
+  }
+
+  /* Film presets */
+  .preset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .preset-btn {
+    background: transparent;
+    border: 1px solid rgba(122,92,62,0.3);
+    color: var(--cream);
+    padding: 12px 16px;
+    cursor: pointer;
+    font-family: 'Courier Prime', monospace;
+    font-size: 13px;
+    text-align: left;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .preset-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--orange);
+    transform: scaleY(0);
+    transition: transform 0.15s ease;
+  }
+
+  .preset-btn:hover {
+    background: rgba(201,185,154,0.06);
+    border-color: rgba(122,92,62,0.7);
+  }
+
+  .preset-btn.active {
+    background: rgba(212,98,42,0.12);
+    border-color: var(--orange);
+    color: var(--cream);
+  }
+
+  .preset-btn.active::before {
+    transform: scaleY(1);
+  }
+
+  .preset-name {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  .preset-tag {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    opacity: 0.4;
+    text-transform: uppercase;
+  }
+
+  .preset-btn.active .preset-tag {
+    color: var(--orange);
+    opacity: 0.7;
+  }
+
+  /* Strength slider */
+  .strength-control {
+    padding: 24px 24px 0;
+  }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+
+  .slider-label {
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--tan);
+    opacity: 0.5;
+  }
+
+  .slider-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--orange);
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2px;
+    background: rgba(122,92,62,0.4);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--orange);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+  }
+
+  /* Download btn */
+  .download-btn {
+    margin: auto 24px 0;
+    padding: 13px;
+    background: transparent;
+    border: 1px solid var(--brown);
+    color: var(--cream);
+    font-family: 'Courier Prime', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: calc(100% - 48px);
+    margin-top: auto;
+  }
+
+  .download-btn:hover:not(:disabled) {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: var(--darkest);
+  }
+
+  .download-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* Canvas area */
+  .canvas-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    position: relative;
+    background: var(--darkest);
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1px dashed rgba(122,92,62,0.5);
+    width: 100%;
+    max-width: 800px;
+    aspect-ratio: 3/2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    background: rgba(201,185,154,0.02);
+  }
+
+  .upload-zone:hover {
+    border-color: var(--orange);
+    background: rgba(212,98,42,0.04);
+  }
+
+  .upload-zone.drag-over {
+    border-color: var(--orange);
+    background: rgba(212,98,42,0.08);
+  }
+
+  .upload-icon {
+    font-size: 42px;
+    margin-bottom: 16px;
+    opacity: 0.3;
+  }
+
+  .upload-text {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--tan);
+    opacity: 0.5;
+    margin-bottom: 8px;
+  }
+
+  .upload-sub {
+    font-size: 10px;
+    color: var(--tan);
+    opacity: 0.3;
+    letter-spacing: 0.1em;
+  }
+
+  #file-input { display: none; }
+
+  /* Image viewer */
+  .image-viewer {
+    width: 100%;
+    max-width: 900px;
+    position: relative;
+    display: none;
+  }
+
+  .image-viewer.visible { display: block; }
+
+  .canvases-wrap {
+    position: relative;
+    width: 100%;
+    line-height: 0;
+  }
+
+  #original-canvas, #output-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  #output-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  /* Before/after toggle */
+  .view-controls {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    border: 1px solid rgba(122,92,62,0.4);
+    align-self: flex-start;
+  }
+
+  .view-btn {
+    padding: 8px 20px;
+    background: transparent;
+    border: none;
+    color: var(--tan);
+    font-family: 'Courier Prime', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .view-btn.active {
+    background: rgba(212,98,42,0.2);
+    color: var(--cream);
+  }
+
+  .view-btn:first-child { border-right: 1px solid rgba(122,92,62,0.4); }
+
+  /* Film info strip */
+  .film-strip {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .film-info {
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--tan);
+    opacity: 0.4;
+  }
+
+  .film-info span {
+    color: var(--orange);
+    opacity: 0.8;
+  }
+
+  /* Sprocket holes decoration */
+  .sprockets {
+    display: flex;
+    gap: 8px;
+    opacity: 0.2;
+  }
+
+  .sprocket {
+    width: 10px;
+    height: 14px;
+    border: 1px solid var(--tan);
+    border-radius: 2px;
+  }
+
+  /* Developing status — typewriter */
+  .dev-status {
+    margin-left: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--orange);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    width: 0;
+  }
+
+  .dev-status.show {
+    opacity: 1;
+    animation: typewriter 0.55s steps(12, end) forwards;
+  }
+
+  .dev-status.hide {
+    opacity: 0;
+    width: 0;
+    animation: none;
+  }
+
+  @keyframes typewriter {
+    from { width: 0; }
+    to   { width: 8.6em; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">GR<span>●</span>IN</div>
+  <div class="tagline">Film Look Studio</div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-label">Film Stock</div>
+      <div class="preset-list" id="preset-list"></div>
+    </div>
+
+    <div class="strength-control">
+      <div class="slider-header">
+        <span class="slider-label">Strength</span>
+        <span class="slider-value" id="strength-display">100%</span>
+      </div>
+      <input type="range" id="strength-slider" min="0" max="100" value="100">
+    </div>
+
+    <button class="download-btn" id="download-btn" disabled>↓ &nbsp; Save Image</button>
+  </aside>
+
+  <main class="canvas-area">
+    <div class="view-controls" id="view-controls" style="display:none;">
+      <button class="view-btn active" id="btn-after">After</button>
+      <button class="view-btn" id="btn-before">Before</button>
+      <span class="dev-status" id="dev-status">Developing...</span>
+    </div>
+
+    <div class="upload-zone" id="upload-zone">
+      <div class="upload-icon">⬡</div>
+      <div class="upload-text">Drop a photo here</div>
+      <div class="upload-sub">or click to browse · JPG, PNG, WEBP</div>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+
+    <div class="image-viewer" id="image-viewer">
+      <div class="canvases-wrap" id="canvases-wrap">
+        <canvas id="original-canvas"></canvas>
+        <canvas id="output-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="film-strip" id="film-strip" style="display:none;">
+      <div class="sprockets">
+        <div class="sprocket"></div><div class="sprocket"></div>
+        <div class="sprocket"></div><div class="sprocket"></div>
+      </div>
+      <div class="film-info" id="film-info">No film selected</div>
+      <div class="sprockets">
+        <div class="sprocket"></div><div class="sprocket"></div>
+        <div class="sprocket"></div><div class="sprocket"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─── FILM PRESETS ────────────────────────────────────────────────────────────
+const PRESETS = [
+  {
+    id: 'portra400',
+    name: 'Kodak Portra 400',
+    tag: '35mm · Color',
+    desc: 'ISO 400 · Warm Tones',
+    apply(ctx, w, h, strength) {
+      const s = strength / 100;
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        // Warm lift in shadows, cool rolloff in highlights
+        r = applyCurve(r, [[0,18],[64,82],[128,140],[192,198],[255,255]]);
+        g = applyCurve(g, [[0,8],[64,70],[128,132],[192,193],[255,250]]);
+        b = applyCurve(b, [[0,5],[64,60],[128,118],[192,178],[255,228]]);
+        // Slight desaturation of extreme values
+        const lum = 0.299*r + 0.587*g + 0.114*b;
+        r = lerp(r, lerp(lum, r, 0.88), s);
+        g = lerp(g, lerp(lum, g, 0.88), s);
+        b = lerp(b, lerp(lum, b, 0.88), s);
+        d[i]   = clamp(lerp(d[i],   r, s));
+        d[i+1] = clamp(lerp(d[i+1], g, s));
+        d[i+2] = clamp(lerp(d[i+2], b, s));
+      }
+      ctx.putImageData(img, 0, 0);
+      // Vignette
+      drawVignette(ctx, w, h, 0.45 * s, 'rgba(28,14,6,');
+      // Subtle grain
+      drawGrain(ctx, w, h, 18 * s);
+      // Halation: soft red glow on highlights
+      drawHalation(ctx, w, h, 0.12 * s, [255, 80, 20]);
+    }
+  },
+  {
+    id: 'velvia50',
+    name: 'Fuji Velvia 50',
+    tag: '35mm · Slide',
+    desc: 'ISO 50 · Vivid',
+    apply(ctx, w, h, strength) {
+      const s = strength / 100;
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        // Deep blacks, punchy mids, vivid saturation
+        r = applyCurve(r, [[0,0],[64,55],[128,135],[192,210],[255,255]]);
+        g = applyCurve(g, [[0,0],[64,60],[128,138],[192,215],[255,252]]);
+        b = applyCurve(b, [[0,0],[64,65],[128,142],[192,210],[255,248]]);
+        // Boost saturation
+        const lum = 0.299*r + 0.587*g + 0.114*b;
+        r = lerp(lum, r, 1.35);
+        g = lerp(lum, g, 1.35);
+        b = lerp(lum, b, 1.35);
+        // Green/teal push in mids
+        g = g + (r + b > 200 ? 0 : 5);
+        b = b + (lum > 100 ? 4 : 0);
+        d[i]   = clamp(lerp(d[i],   r, s));
+        d[i+1] = clamp(lerp(d[i+1], g, s));
+        d[i+2] = clamp(lerp(d[i+2], b, s));
+      }
+      ctx.putImageData(img, 0, 0);
+      drawVignette(ctx, w, h, 0.35 * s, 'rgba(0,5,10,');
+      drawGrain(ctx, w, h, 8 * s);
+    }
+  },
+  {
+    id: 'hp5',
+    name: 'Ilford HP5',
+    tag: '35mm · B&W',
+    desc: 'ISO 400 · Classic',
+    apply(ctx, w, h, strength) {
+      const s = strength / 100;
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        // Panchromatic B&W response — slightly blue-sensitive
+        let lum = 0.25*r + 0.65*g + 0.10*b;
+        // S-curve for contrast
+        lum = applyCurve(lum, [[0,0],[50,35],[128,132],[200,215],[255,255]]);
+        // Blend to grey
+        r = lerp(d[i],   lerp(d[i],   lum, s), s);
+        g = lerp(d[i+1], lerp(d[i+1], lum, s), s);
+        b = lerp(d[i+2], lerp(d[i+2], lum, s), s);
+        d[i]   = clamp(r);
+        d[i+1] = clamp(g);
+        d[i+2] = clamp(b);
+      }
+      ctx.putImageData(img, 0, 0);
+      drawVignette(ctx, w, h, 0.5 * s, 'rgba(0,0,0,');
+      drawGrain(ctx, w, h, 28 * s);
+    }
+  },
+  {
+    id: 'trix',
+    name: 'Kodak Tri-X',
+    tag: '35mm · B&W',
+    desc: 'ISO 400 · Contrasty',
+    apply(ctx, w, h, strength) {
+      const s = strength / 100;
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2];
+        // Orthochromatic-ish: boosts reds slightly
+        let lum = 0.35*r + 0.55*g + 0.10*b;
+        // More aggressive S-curve
+        lum = applyCurve(lum, [[0,0],[40,22],[100,90],[160,178],[220,230],[255,255]]);
+        r = clamp(lerp(d[i],   lum, s));
+        g = clamp(lerp(d[i+1], lum, s));
+        b = clamp(lerp(d[i+2], lum, s));
+        d[i] = r; d[i+1] = g; d[i+2] = b;
+      }
+      ctx.putImageData(img, 0, 0);
+      drawVignette(ctx, w, h, 0.6 * s, 'rgba(0,0,0,');
+      drawGrain(ctx, w, h, 38 * s);
+    }
+  }
+];
+
+// ─── UTILITY FUNCTIONS ────────────────────────────────────────────────────────
+function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function applyCurve(val, points) {
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i+1];
+    if (val >= x0 && val <= x1) {
+      const t = (val - x0) / (x1 - x0);
+      return y0 + t * (y1 - y0);
+    }
+  }
+  return val;
+}
+
+function drawVignette(ctx, w, h, strength, colorBase) {
+  const cx = w / 2, cy = h / 2;
+  const r = Math.sqrt(cx*cx + cy*cy) * 1.1;
+  const grad = ctx.createRadialGradient(cx, cy, r * 0.3, cx, cy, r);
+  grad.addColorStop(0, colorBase + '0)');
+  grad.addColorStop(0.6, colorBase + (strength * 0.4).toFixed(3) + ')');
+  grad.addColorStop(1, colorBase + strength.toFixed(3) + ')');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawGrain(ctx, w, h, amount) {
+  if (amount < 1) return;
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const noise = (Math.random() - 0.5) * amount;
+    d[i]   = clamp(d[i]   + noise);
+    d[i+1] = clamp(d[i+1] + noise);
+    d[i+2] = clamp(d[i+2] + noise);
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function drawHalation(ctx, w, h, strength, color) {
+  if (strength < 0.01) return;
+  // Extract highlight mask and blur for halation
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = w; tempCanvas.height = h;
+  const tCtx = tempCanvas.getContext('2d');
+  tCtx.drawImage(ctx.canvas, 0, 0);
+  const img = tCtx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    const mask = Math.max(0, (lum - 180) / 75);
+    d[i]   = clamp(color[0] * mask);
+    d[i+1] = clamp(color[1] * mask);
+    d[i+2] = clamp(color[2] * mask);
+    d[i+3] = clamp(mask * 255 * 0.6);
+  }
+  tCtx.putImageData(img, 0, 0);
+  ctx.filter = `blur(${Math.round(w * 0.015)}px)`;
+  ctx.globalAlpha = strength * 1.5;
+  ctx.globalCompositeOperation = 'screen';
+  ctx.drawImage(tempCanvas, 0, 0);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+// ─── APP STATE ────────────────────────────────────────────────────────────────
+let currentPreset = PRESETS[0];
+let strength = 100;
+let imageLoaded = false;
+let showingBefore = false;
+let processing = false;
+
+const originalCanvas = document.getElementById('original-canvas');
+const outputCanvas   = document.getElementById('output-canvas');
+const origCtx  = originalCanvas.getContext('2d');
+const outCtx   = outputCanvas.getContext('2d');
+
+// ─── BUILD PRESET LIST ────────────────────────────────────────────────────────
+const presetList = document.getElementById('preset-list');
+PRESETS.forEach(p => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn' + (p.id === currentPreset.id ? ' active' : '');
+  btn.dataset.id = p.id;
+  btn.innerHTML = `
+    <div>
+      <div class="preset-name">${p.name}</div>
+    </div>
+    <div class="preset-tag">${p.tag}</div>
+  `;
+  btn.addEventListener('click', () => selectPreset(p));
+  presetList.appendChild(btn);
+});
+
+function selectPreset(p) {
+  currentPreset = p;
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.id === p.id);
+  });
+  document.getElementById('film-info').innerHTML =
+    `<span>${p.name}</span> &nbsp;·&nbsp; ${p.desc}`;
+  if (imageLoaded) applyPreset();
+}
+
+// ─── STRENGTH SLIDER ──────────────────────────────────────────────────────────
+const slider = document.getElementById('strength-slider');
+const display = document.getElementById('strength-display');
+let debounceTimer;
+
+slider.addEventListener('input', () => {
+  strength = parseInt(slider.value);
+  display.textContent = strength + '%';
+  if (imageLoaded) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyPreset, 60);
+  }
+});
+
+// ─── VIEW TOGGLE ──────────────────────────────────────────────────────────────
+document.getElementById('btn-after').addEventListener('click', () => {
+  showingBefore = false;
+  outputCanvas.style.opacity = '1';
+  document.getElementById('btn-after').classList.add('active');
+  document.getElementById('btn-before').classList.remove('active');
+});
+
+document.getElementById('btn-before').addEventListener('click', () => {
+  showingBefore = true;
+  outputCanvas.style.opacity = '0';
+  document.getElementById('btn-before').classList.add('active');
+  document.getElementById('btn-after').classList.remove('active');
+});
+
+// ─── UPLOAD / DROP ────────────────────────────────────────────────────────────
+const uploadZone = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadImage(file);
+});
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(e.target.files[0]);
+});
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      // Cap size for performance
+      const MAX = 1800;
+      let W = img.width, H = img.height;
+      if (W > MAX) { H = Math.round(H * MAX / W); W = MAX; }
+      if (H > MAX) { W = Math.round(W * MAX / H); H = MAX; }
+
+      originalCanvas.width  = outputCanvas.width  = W;
+      originalCanvas.height = outputCanvas.height = H;
+
+      origCtx.drawImage(img, 0, 0, W, H);
+      imageLoaded = true;
+
+      // Show UI
+      uploadZone.style.display = 'none';
+      document.getElementById('image-viewer').classList.add('visible');
+      document.getElementById('view-controls').style.display = 'flex';
+      document.getElementById('film-strip').style.display = 'flex';
+      document.getElementById('download-btn').disabled = false;
+
+      applyPreset();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── APPLY PRESET ─────────────────────────────────────────────────────────────
+function applyPreset() {
+  if (!imageLoaded || processing) return;
+  processing = true;
+  const devStatus = document.getElementById('dev-status');
+  // Reset animation: remove both classes, force reflow, then re-add show
+  devStatus.classList.remove('show', 'hide');
+  void devStatus.offsetWidth; // force reflow so animation retriggers
+  devStatus.classList.add('show');
+
+  setTimeout(() => {
+    const W = originalCanvas.width;
+    const H = originalCanvas.height;
+
+    outCtx.clearRect(0, 0, W, H);
+    outCtx.drawImage(originalCanvas, 0, 0);
+
+    currentPreset.apply(outCtx, W, H, strength);
+
+    devStatus.classList.remove('show');
+    devStatus.classList.add('hide');
+    processing = false;
+
+    document.getElementById('film-info').innerHTML =
+      `<span>${currentPreset.name}</span> &nbsp;·&nbsp; ${currentPreset.desc} &nbsp;·&nbsp; Strength: ${strength}%`;
+  }, 30);
+}
+
+// ─── DOWNLOAD ─────────────────────────────────────────────────────────────────
+document.getElementById('download-btn').addEventListener('click', () => {
+  if (!imageLoaded) return;
+
+  const W = outputCanvas.width;
+  const H = outputCanvas.height;
+
+  // Flatten: white background + processed image onto a fresh canvas
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width  = W;
+  exportCanvas.height = H;
+  const eCtx = exportCanvas.getContext('2d');
+  eCtx.fillStyle = '#fff';
+  eCtx.fillRect(0, 0, W, H);
+  eCtx.drawImage(outputCanvas, 0, 0, W, H);
+
+  // Use toBlob for reliable download across browsers
+  exportCanvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `grain-${currentPreset.id}-${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }, 'image/jpeg', 0.95);
+});
+</script>
+</body>
+</html>
