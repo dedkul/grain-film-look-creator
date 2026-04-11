@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAIN — Film Look Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Courier+Prime:wght@400;700&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --cream:#f2ead8;--tan:#c9b99a;--brown:#7a5c3e;
+  --darkest:#0d0a07;--dark:#130e09;
+  --orange:#d4622a;--odim:rgba(212,98,42,.13);
+  --rule:rgba(122,92,62,.22);
+  --lw:220px;--rw:258px;--hh:58px;
+  --sheet-h:54vh;
+  --handle-h:44px;
+}
+
+html,body{height:100%;overflow:hidden}
+body{background:var(--darkest);color:var(--cream);font-family:'Courier Prime',monospace}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.38;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.045'/%3E%3C/svg%3E");
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────────── */
+header{
+  position:fixed;top:0;left:0;right:0;height:var(--hh);z-index:400;
+  border-bottom:1px solid var(--brown);padding:0 20px;
+  display:flex;align-items:center;gap:14px;background:var(--darkest);
+}
+.logo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;letter-spacing:.15em}
+.logo em{color:var(--orange);font-style:normal}
+.tagline{font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:var(--tan);opacity:.5}
+
+/* ── DESKTOP PANELS ──────────────────────────────────────────────────────── */
+.left-panel,.right-panel{
+  position:fixed;top:var(--hh);bottom:0;
+  display:flex;flex-direction:column;z-index:100;
+}
+.left-panel {left:0;  width:var(--lw);border-right:1px solid var(--rule);background:var(--dark)}
+.right-panel{right:0; width:var(--rw);border-left:1px solid var(--rule);background:var(--dark)}
+.panel-inner{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(122,92,62,.2) transparent}
+.panel-footer{flex-shrink:0;padding:12px 16px;border-top:1px solid var(--rule);background:var(--darkest)}
+
+/* ── CANVAS AREA — always fills behind everything ───────────────────────── */
+/* On desktop: left/right bounded. On mobile: always full screen. */
+.canvas-area{
+  position:fixed;top:var(--hh);bottom:0;
+  left:var(--lw);right:var(--rw);
+  display:flex;flex-direction:column;
+  background:var(--darkest);overflow:hidden;
+  z-index:1; /* lowest — always behind sheet */
+}
+
+/* ── TOP BAR ─────────────────────────────────────────────────────────────── */
+.top-bar{
+  display:none;align-items:center;gap:8px;padding:8px 12px;
+  border-bottom:1px solid var(--rule);flex-shrink:0;
+  background:rgba(13,10,7,.9);
+}
+.top-bar.visible{display:flex}
+
+.view-toggle{display:flex;border:1px solid rgba(122,92,62,.36)}
+.view-btn{
+  padding:5px 13px;background:transparent;border:none;
+  color:var(--tan);font-family:'Courier Prime',monospace;
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  cursor:pointer;transition:all .14s;
+}
+.view-btn:first-child{border-right:1px solid rgba(122,92,62,.36)}
+.view-btn.active{background:var(--odim);color:var(--cream)}
+
+/* "Open Photo" button — same visual language as view buttons */
+.open-photo-btn{
+  padding:5px 11px;background:transparent;
+  border:1px solid rgba(122,92,62,.36);color:var(--tan);
+  font-family:'Courier Prime',monospace;font-size:9px;
+  letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:all .15s;
+  white-space:nowrap;
+}
+.open-photo-btn:hover{border-color:var(--orange);color:var(--cream)}
+
+.dev-status{
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.12em;color:var(--orange);
+  opacity:0;pointer-events:none;white-space:nowrap;overflow:hidden;width:0;
+}
+.dev-status.show{opacity:1;animation:tw .5s steps(12,end) forwards}
+.dev-status.hide{opacity:0;width:0;animation:none}
+@keyframes tw{from{width:0}to{width:8.6em}}
+
+.zoom-controls{margin-left:auto;display:flex;align-items:center;border:1px solid rgba(122,92,62,.36)}
+.zoom-btn{
+  width:28px;height:28px;background:transparent;border:none;
+  color:var(--tan);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .13s;user-select:none;
+}
+.zoom-btn:hover{background:var(--odim);color:var(--cream)}
+.zoom-level{
+  padding:0 7px;font-family:'Space Mono',monospace;font-size:9px;color:var(--tan);
+  min-width:40px;text-align:center;
+  border-left:1px solid rgba(122,92,62,.36);border-right:1px solid rgba(122,92,62,.36);
+}
+
+/* ── IMAGE VIEWPORT ──────────────────────────────────────────────────────── */
+.image-viewport{
+  flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;
+  scrollbar-width:thin;scrollbar-color:rgba(122,92,62,.18) transparent;
+}
+.upload-zone{
+  border:1px dashed rgba(122,92,62,.42);width:400px;max-width:88%;aspect-ratio:3/2;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;background:rgba(201,185,154,.02);flex-shrink:0;
+}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--orange);background:rgba(212,98,42,.05)}
+.upload-icon{font-size:30px;margin-bottom:12px;opacity:.2}
+.upload-text{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--tan);opacity:.42;margin-bottom:4px}
+.upload-sub{font-size:9px;color:var(--tan);opacity:.25;letter-spacing:.1em}
+#file-input{display:none}
+
+.canvases-wrap{
+  position:relative;display:none;line-height:0;
+  transform-origin:center center;transition:transform .18s ease;flex-shrink:0;
+}
+.canvases-wrap.visible{display:block}
+#original-canvas{display:block;height:auto}
+#output-canvas{position:absolute;top:0;left:0;width:100%;height:100%;transition:opacity .25s}
+
+/* ── FILM STRIP ──────────────────────────────────────────────────────────── */
+.film-strip{display:none;align-items:center;gap:12px;padding:6px 14px;border-top:1px solid var(--rule);flex-shrink:0}
+.film-strip.visible{display:flex}
+.sprockets{display:flex;gap:5px;opacity:.12}
+.sprocket{width:8px;height:11px;border:1px solid var(--tan);border-radius:2px}
+.film-info{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--tan);opacity:.35;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.film-info em{color:var(--orange);opacity:.82;font-style:normal}
+
+/* ── LABELS / HEADS ──────────────────────────────────────────────────────── */
+.sec-label{display:block;padding:14px 16px 8px;font-size:9px;letter-spacing:.36em;text-transform:uppercase;color:var(--tan);opacity:.4;border-bottom:1px solid var(--rule)}
+.ctrl-sec-head{padding:11px 16px 5px;font-size:9px;letter-spacing:.34em;text-transform:uppercase;color:var(--tan);opacity:.38;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--rule)}
+.ctrl-dot{width:4px;height:4px;border-radius:50%;background:var(--orange);opacity:.6;flex-shrink:0}
+
+/* ── PRESET ACCORDION ────────────────────────────────────────────────────── */
+.preset-list{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.preset-item{border:1px solid rgba(122,92,62,.26);transition:border-color .15s}
+.preset-item.active{border-color:var(--orange)}
+.preset-hd{
+  width:100%;background:transparent;border:none;color:var(--cream);
+  padding:9px 12px;cursor:pointer;font-family:'Courier Prime',monospace;
+  text-align:left;display:flex;align-items:center;justify-content:space-between;
+  gap:8px;transition:background .14s;position:relative;overflow:hidden;
+}
+.preset-hd::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--orange);transform:scaleY(0);transition:transform .15s}
+.preset-item.active .preset-hd::before{transform:scaleY(1)}
+.preset-hd:hover{background:rgba(201,185,154,.05)}
+.preset-item.active .preset-hd{background:var(--odim)}
+.p-name{font-weight:700;font-size:10px;letter-spacing:.04em}
+.p-meta{font-size:8px;letter-spacing:.14em;text-transform:uppercase;opacity:.32;margin-top:1px}
+.preset-item.active .p-meta{color:var(--orange);opacity:.6}
+.p-arrow{font-size:9px;opacity:.28;transition:transform .2s;flex-shrink:0}
+.preset-item.active .p-arrow{transform:rotate(180deg);opacity:.65}
+.preset-body{max-height:0;overflow:hidden;transition:max-height .22s ease;background:rgba(0,0,0,.22)}
+.preset-item.active .preset-body{max-height:62px}
+.strength-wrap{padding:9px 14px 11px}
+.strength-row{display:flex;align-items:center;gap:8px}
+.str-label{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--tan);opacity:.4;white-space:nowrap;flex-shrink:0}
+.str-val{font-family:'Space Mono',monospace;font-size:10px;color:var(--orange);white-space:nowrap;min-width:32px;text-align:right;flex-shrink:0}
+.str-slider{flex:1;min-width:0;-webkit-appearance:none;height:2px;background:rgba(122,92,62,.38);outline:none;cursor:pointer}
+.str-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--orange);border-radius:50%;cursor:pointer}
+
+/* ── CONTROL ROWS ────────────────────────────────────────────────────────── */
+.ctrl-row{display:grid;grid-template-columns:80px 1fr 38px 18px;align-items:center;column-gap:5px;padding:6px 14px}
+.ctrl-label{font-size:10px;color:var(--tan);opacity:.55;white-space:nowrap;overflow:hidden}
+.ctrl-slider{min-width:0;-webkit-appearance:none;width:100%;height:2px;background:rgba(122,92,62,.35);outline:none;cursor:pointer}
+.ctrl-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:var(--orange);border-radius:50%;cursor:pointer;transition:transform .1s}
+.ctrl-slider::-webkit-slider-thumb:hover{transform:scale(1.3)}
+.ctrl-number{width:38px;background:rgba(122,92,62,.1);border:1px solid rgba(122,92,62,.24);color:var(--cream);font-family:'Space Mono',monospace;font-size:9px;text-align:center;padding:3px 2px;outline:none;-moz-appearance:textfield}
+.ctrl-number::-webkit-outer-spin-button,.ctrl-number::-webkit-inner-spin-button{-webkit-appearance:none}
+.ctrl-number:focus{border-color:var(--orange)}
+.ctrl-reset{width:16px;height:16px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.22;transition:opacity .14s;padding:0;flex-shrink:0}
+.ctrl-reset:hover{opacity:.72}
+.ctrl-reset svg{width:10px;height:10px;fill:var(--tan)}
+
+/* ── BUTTONS ─────────────────────────────────────────────────────────────── */
+.btn-ghost{width:100%;padding:10px;background:transparent;border:1px solid rgba(122,92,62,.3);color:var(--tan);font-family:'Courier Prime',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;cursor:pointer;transition:all .18s;margin-bottom:7px}
+.btn-ghost:hover{border-color:var(--tan);color:var(--cream)}
+.btn-primary{width:100%;padding:11px;background:transparent;border:1px solid var(--brown);color:var(--cream);font-family:'Courier Prime',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn-primary:hover:not(:disabled){background:var(--orange);border-color:var(--orange);color:var(--darkest)}
+.btn-primary:disabled{opacity:.24;cursor:not-allowed}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE  ≤ 768px
+   
+   KEY MENTAL MODEL — Z-STACK, not vertical stack:
+   - Canvas area: position:fixed, full screen (top:hh, left:0, right:0, bottom:0)
+   - Bottom sheet: position:fixed, bottom:0, sits ON TOP of canvas via z-index
+   - Canvas never resizes — the sheet floats over it
+   - Focus mode: sheet goes nearly invisible, only focused row + image visible
+   ══════════════════════════════════════════════════════════════════════════ */
+@media(max-width:768px){
+  /* Canvas always fills full screen behind everything */
+  .canvas-area{
+    left:0!important;
+    right:0!important;
+    bottom:0!important; /* always full height — never pushed by sheet */
+    z-index:1;
+  }
+
+  /* Hide desktop side panels */
+  .left-panel,.right-panel{display:none!important}
+
+  /* ── BOTTOM SHEET ────────────────────────────────────────────────────────
+     Fixed to bottom, floats over canvas via z-index.
+     Height = --sheet-h. Collapses by translating down to show only handle. */
+  .mob-sheet{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    height:var(--sheet-h);
+    z-index:50; /* above canvas (1), below focus overlay (90) */
+    background:rgba(19,14,9,.96);
+    border-top:1px solid var(--brown);
+    display:flex;flex-direction:column;
+    transform:translateY(0);
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    will-change:transform;
+  }
+
+  /* Collapsed: translate down so only the handle bar peeks out */
+  .mob-sheet.collapsed{
+    transform:translateY(calc(var(--sheet-h) - var(--handle-h)));
+  }
+
+  /* Handle bar */
+  .mob-handle{
+    flex-shrink:0;
+    height:var(--handle-h);
+    display:flex;align-items:center;
+    padding:0 12px;gap:8px;
+    border-bottom:1px solid var(--rule);
+    background:var(--darkest);
+    cursor:pointer;
+  }
+  .mob-handle-pill{
+    width:32px;height:3px;
+    background:rgba(122,92,62,.45);
+    border-radius:2px;flex-shrink:0;
+  }
+  .mob-tabs{display:flex;flex:1;gap:0}
+  .mob-tab{
+    flex:1;padding:0 0 2px;background:transparent;border:none;
+    color:var(--tan);font-family:'Courier Prime',monospace;
+    font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+    cursor:pointer;transition:all .14s;border-bottom:2px solid transparent;
+    height:100%;display:flex;align-items:center;justify-content:center;
+  }
+  .mob-tab.active{color:var(--cream);border-bottom-color:var(--orange)}
+
+  /* Collapse button — same visual language as view-btn */
+  .mob-collapse-btn{
+    padding:4px 10px;background:transparent;
+    border:1px solid rgba(122,92,62,.36);color:var(--tan);
+    font-family:'Courier Prime',monospace;font-size:8px;
+    letter-spacing:.16em;text-transform:uppercase;
+    cursor:pointer;transition:all .14s;white-space:nowrap;flex-shrink:0;
+  }
+  .mob-collapse-btn:hover{border-color:var(--orange);color:var(--cream)}
+  /* when collapsed the button says "Show" */
+  .mob-sheet.collapsed .mob-collapse-btn{color:var(--orange);border-color:rgba(212,98,42,.4)}
+
+  /* Sheet content + footer */
+  .mob-sheet-content{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(122,92,62,.18) transparent;-webkit-overflow-scrolling:touch}
+  .mob-panel{display:none}
+  .mob-panel.active{display:block}
+  .mob-sheet-footer{flex-shrink:0;padding:10px 14px;border-top:1px solid var(--rule);background:var(--darkest);display:flex;gap:8px}
+  .mob-sheet-footer .btn-ghost{margin:0;flex:1;padding:9px 6px;font-size:9px}
+  .mob-sheet-footer .btn-primary{flex:1;padding:9px 6px;font-size:9px}
+
+  /* ── FOCUS MODE ──────────────────────────────────────────────────────────
+     When dragging a slider:
+     1. A near-black overlay covers everything at z-index:80
+     2. Canvas sits at z-index:81 — visible THROUGH overlay's gap (no, overlay is full)
+        Actually: overlay is rgba(0,0,0,.88), canvas is z:82 so image shows above overlay
+     3. Sheet comes up to z:90, completely transparent bg, only focused row visible
+     4. Focused row floats at bottom of screen clearly above everything */
+
+  /* The darkening overlay — covers header + background */
+  .focus-overlay{
+    display:none;
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.9);
+    z-index:80;
+    pointer-events:none;
+    transition:opacity .2s;
+  }
+
+  /* During focus mode */
+  body.focus-mode .focus-overlay{display:block}
+
+  /* Canvas rises above overlay so image is visible */
+  body.focus-mode .canvas-area{z-index:82!important}
+
+  /* Sheet rises highest, transparent bg */
+  body.focus-mode .mob-sheet{
+    z-index:90;
+    background:transparent;
+    border-top:none;
+    height:auto;      /* shrink to content */
+    transform:translateY(0)!important;
+    transition:none;
+  }
+
+  /* Hide handle, footer, non-focused content */
+  body.focus-mode .mob-handle{display:none}
+  body.focus-mode .mob-sheet-footer{display:none}
+  body.focus-mode .mob-sheet-content{overflow:visible}
+  body.focus-mode .mob-panel{display:block!important}
+
+  /* All rows hidden except focused */
+  body.focus-mode .ctrl-row:not(.focused){
+    height:0;padding:0;overflow:hidden;opacity:0;pointer-events:none;border:none;
+  }
+  body.focus-mode .ctrl-sec-head{height:0;padding:0;overflow:hidden;opacity:0;border:none}
+  body.focus-mode .preset-list  {height:0;padding:0;overflow:hidden;opacity:0}
+
+  /* Focused row — sits at bottom, clearly visible, no layout shift */
+  body.focus-mode .ctrl-row.focused{
+    position:fixed;
+    left:0;right:0;bottom:0;
+    height:64px;
+    z-index:91;
+    background:rgba(13,10,7,.98);
+    border-top:1px solid var(--orange);
+    padding:0 16px;
+    display:grid;
+    grid-template-columns:80px 1fr 38px 18px;
+    align-items:center;
+    column-gap:8px;
+    /* Remove any transform that came from the sheet collapsing */
+    transform:none;
+  }
+  body.focus-mode .ctrl-row.focused .ctrl-label{color:var(--orange);opacity:1;font-size:11px}
+  body.focus-mode .ctrl-row.focused .ctrl-slider{height:3px}
+  body.focus-mode .ctrl-row.focused .ctrl-slider::-webkit-slider-thumb{width:20px;height:20px}
+
+  /* Hide zoom on mobile */
+  .zoom-controls{display:none}
+
+  /* Smaller open-photo button on mobile */
+  .open-photo-btn{font-size:8px;padding:4px 9px;letter-spacing:.12em}
+}
+
+/* Desktop: ensure sheet hidden, panels shown */
+.mob-sheet,.focus-overlay{display:none}
+@media(max-width:768px){
+  .mob-sheet{display:flex}
+}
+@media(min-width:769px){
+  .left-panel,.right-panel{display:flex!important}
+  .mob-sheet{display:none!important}
+  .canvas-area{left:var(--lw)!important;right:var(--rw)!important}
+}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(122,92,62,.22);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- Focus mode overlay -->
+<div class="focus-overlay" id="focus-overlay"></div>
+
+<header>
+  <div class="logo">GR<em>●</em>IN</div>
+  <div class="tagline">Film Look Studio</div>
+</header>
+
+<!-- DESKTOP LEFT -->
+<aside class="left-panel">
+  <span class="sec-label">Film Stock</span>
+  <div class="panel-inner">
+    <div class="preset-list" id="preset-list-d"></div>
+  </div>
+</aside>
+
+<!-- CANVAS (full screen on mobile, bounded on desktop) -->
+<main class="canvas-area">
+  <div class="top-bar" id="top-bar">
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-after">After</button>
+      <button class="view-btn"        id="btn-before">Before</button>
+    </div>
+    <button class="open-photo-btn" id="open-photo-btn">Open Photo</button>
+    <span class="dev-status" id="dev-status">Developing...</span>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoom-out">−</button>
+      <span class="zoom-level" id="zoom-level">100%</span>
+      <button class="zoom-btn" id="zoom-in">+</button>
+    </div>
+  </div>
+
+  <div class="image-viewport" id="image-viewport">
+    <div class="upload-zone" id="upload-zone">
+      <div class="upload-icon">⬡</div>
+      <div class="upload-text">Drop a photo here</div>
+      <div class="upload-sub">or click to browse · JPG PNG WEBP</div>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+    <div class="canvases-wrap" id="canvases-wrap">
+      <canvas id="original-canvas"></canvas>
+      <canvas id="output-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="film-strip" id="film-strip">
+    <div class="sprockets"><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div></div>
+    <div class="film-info" id="film-info">No preset selected</div>
+    <div class="sprockets"><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div></div>
+  </div>
+</main>
+
+<!-- DESKTOP RIGHT -->
+<aside class="right-panel">
+  <div class="panel-inner">
+    <div class="ctrl-sec-head"><span class="ctrl-dot"></span>Tone</div>
+    <div id="tone-d"></div>
+    <div class="ctrl-sec-head" style="margin-top:2px"><span class="ctrl-dot"></span>Film</div>
+    <div id="film-d"></div>
+  </div>
+  <div class="panel-footer">
+    <button class="btn-ghost"   id="reset-btn-d">↺ &nbsp;Reset All</button>
+    <button class="btn-primary" id="save-btn-d" disabled>↓ &nbsp;Save Image</button>
+  </div>
+</aside>
+
+<!-- MOBILE BOTTOM SHEET -->
+<div class="mob-sheet" id="mob-sheet">
+
+  <!-- Handle: pill + tabs + collapse button -->
+  <div class="mob-handle" id="mob-handle">
+    <div class="mob-handle-pill" id="mob-pill"></div>
+    <div class="mob-tabs">
+      <button class="mob-tab active" data-tab="presets">Presets</button>
+      <button class="mob-tab"        data-tab="controls">Controls</button>
+    </div>
+    <button class="mob-collapse-btn" id="mob-collapse-btn">Hide</button>
+  </div>
+
+  <div class="mob-sheet-content">
+    <div class="mob-panel active" id="mob-panel-presets">
+      <div class="preset-list" id="preset-list-m"></div>
+    </div>
+    <div class="mob-panel" id="mob-panel-controls">
+      <div class="ctrl-sec-head"><span class="ctrl-dot"></span>Tone</div>
+      <div id="tone-m"></div>
+      <div class="ctrl-sec-head" style="margin-top:2px"><span class="ctrl-dot"></span>Film</div>
+      <div id="film-m"></div>
+    </div>
+  </div>
+
+  <div class="mob-sheet-footer">
+    <button class="btn-ghost"   id="reset-btn-m">↺ Reset</button>
+    <button class="btn-primary" id="save-btn-m" disabled>↓ Save</button>
+  </div>
+</div>
+
+<script>
+// ─── PRESETS ──────────────────────────────────────────────────────────────────
+const PRESETS=[
+  {id:'portra400',name:'Kodak Portra 400',tag:'35mm · Color',desc:'ISO 400 · Warm Tones',
+   params:{exposure:5,contrast:10,highlights:-14,shadows:18,saturation:-8,temperature:22,grain:30,bloom:10,vignette:28}},
+  {id:'velvia50',name:'Fuji Velvia 50',tag:'35mm · Slide',desc:'ISO 50 · Vivid',
+   params:{exposure:0,contrast:36,highlights:-8,shadows:-10,saturation:46,temperature:-10,grain:7,bloom:16,vignette:18}},
+  {id:'hp5',name:'Ilford HP5',tag:'35mm · B&W',desc:'ISO 400 · Classic',
+   params:{exposure:3,contrast:18,highlights:-10,shadows:12,saturation:-100,temperature:0,grain:34,bloom:4,vignette:42}},
+  {id:'trix',name:'Kodak Tri-X',tag:'35mm · B&W',desc:'ISO 400 · Contrasty',
+   params:{exposure:-3,contrast:38,highlights:-22,shadows:-14,saturation:-100,temperature:0,grain:58,bloom:0,vignette:52}},
+  {id:'cine800t',name:'Cinestill 800T',tag:'35mm · Tungsten',desc:'ISO 800 · Neon Nights',
+   params:{exposure:2,contrast:14,highlights:-6,shadows:10,saturation:8,temperature:-32,grain:52,bloom:22,vignette:38}},
+  {id:'gold200',name:'Kodak Gold 200',tag:'35mm · Color',desc:'ISO 200 · Sunny & Warm',
+   params:{exposure:6,contrast:12,highlights:-6,shadows:14,saturation:18,temperature:30,grain:18,bloom:8,vignette:22}},
+  {id:'pro400h',name:'Fuji Pro 400H',tag:'120 · Color',desc:'ISO 400 · Pastel Cool',
+   params:{exposure:8,contrast:-8,highlights:6,shadows:16,saturation:-16,temperature:-18,grain:22,bloom:6,vignette:16}},
+  {id:'agfavista',name:'Agfa Vista 200',tag:'35mm · Color',desc:'ISO 200 · Punchy',
+   params:{exposure:2,contrast:22,highlights:-4,shadows:6,saturation:28,temperature:8,grain:20,bloom:10,vignette:24}},
+  {id:'faded',name:'Faded Matte',tag:'Digital · Look',desc:'Lifted · Desaturated',
+   params:{exposure:4,contrast:-22,highlights:-18,shadows:32,saturation:-30,temperature:10,grain:14,bloom:4,vignette:14}},
+  {id:'xpro',name:'Cross Process',tag:'35mm · XPro',desc:'Slide in C-41 · Shifted',
+   params:{exposure:0,contrast:44,highlights:12,shadows:-16,saturation:52,temperature:-20,grain:28,bloom:6,vignette:32}},
+];
+
+const TONE_DEFS=[
+  {key:'exposure',   label:'Exposure',   min:-100,max:100,def:0},
+  {key:'contrast',   label:'Contrast',   min:-100,max:100,def:0},
+  {key:'highlights', label:'Highlights', min:-100,max:100,def:0},
+  {key:'shadows',    label:'Shadows',    min:-100,max:100,def:0},
+  {key:'saturation', label:'Saturation', min:-100,max:100,def:0},
+  {key:'temperature',label:'Temperature',min:-100,max:100,def:0},
+];
+const FILM_DEFS=[
+  {key:'grain',   label:'Grain',   min:0,max:100,def:0},
+  {key:'bloom',   label:'Bloom',   min:0,max:100,def:0},
+  {key:'vignette',label:'Vignette',min:0,max:100,def:0},
+];
+const ALL_DEFS=[...TONE_DEFS,...FILM_DEFS];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let params={...Object.fromEntries(ALL_DEFS.map(d=>[d.key,d.def]))};
+let activePreset=null,presetStr=100;
+let imageLoaded=false,processing=false,zoomLevel=1.0,debTimer;
+let sheetCollapsed=false;
+const ZOOM_STEPS=[0.25,0.33,0.5,0.67,0.75,1.0,1.25,1.5,2.0,2.5,3.0];
+
+const origCanvas=document.getElementById('original-canvas');
+const outCanvas =document.getElementById('output-canvas');
+const origCtx   =origCanvas.getContext('2d');
+const outCtx    =outCanvas.getContext('2d');
+const wrap      =document.getElementById('canvases-wrap');
+const vp        =document.getElementById('image-viewport');
+
+// ─── BUILD CONTROL ROWS ───────────────────────────────────────────────────────
+function makeRow(def,container,sfx){
+  const row=document.createElement('div');
+  row.className='ctrl-row';row.dataset.key=def.key;row.id='row-'+def.key+'-'+sfx;
+
+  const lbl=document.createElement('span');
+  lbl.className='ctrl-label';lbl.textContent=def.label;
+
+  const sl=document.createElement('input');
+  sl.type='range';sl.className='ctrl-slider';
+  sl.id='s-'+def.key+'-'+sfx;sl.min=def.min;sl.max=def.max;sl.value=params[def.key];
+
+  const num=document.createElement('input');
+  num.type='number';num.className='ctrl-number';
+  num.id='n-'+def.key+'-'+sfx;num.min=def.min;num.max=def.max;num.value=params[def.key];
+
+  const rst=document.createElement('button');
+  rst.className='ctrl-reset';rst.title='Reset';
+  rst.innerHTML=`<svg viewBox="0 0 12 12"><path d="M6 1.5A4.5 4.5 0 1 0 10.5 6h-1.2A3.3 3.3 0 1 1 6 2.7V1.5z"/><path d="M5.4.6l2.1 2.1-2.1 2.1V.6z"/></svg>`;
+  rst.addEventListener('click',()=>{setCtrl(def.key,def.def);schedRender()});
+
+  sl.addEventListener('dblclick',()=>{setCtrl(def.key,def.def);schedRender()});
+
+  sl.addEventListener('input',()=>{
+    params[def.key]=+sl.value;syncUI(def.key);schedRender();
+    if(isMob()) enterFocus(row);
+  });
+
+  // Exit focus on pointer/touch up
+  sl.addEventListener('pointerup', ()=>{ if(isMob()) exitFocus(); });
+  sl.addEventListener('touchend',  ()=>{ if(isMob()) exitFocus(); });
+
+  num.addEventListener('change',()=>{
+    const v=Math.max(def.min,Math.min(def.max,parseInt(num.value)||0));
+    setCtrl(def.key,v);schedRender();
+  });
+  num.addEventListener('keydown',e=>{if(e.key==='Enter')num.blur()});
+
+  row.append(lbl,sl,num,rst);
+  container.appendChild(row);
+}
+
+TONE_DEFS.forEach(d=>{
+  makeRow(d,document.getElementById('tone-d'),'d');
+  makeRow(d,document.getElementById('tone-m'),'m');
+});
+FILM_DEFS.forEach(d=>{
+  makeRow(d,document.getElementById('film-d'),'d');
+  makeRow(d,document.getElementById('film-m'),'m');
+});
+
+// ─── SET / SYNC ───────────────────────────────────────────────────────────────
+function setCtrl(key,val){
+  const def=ALL_DEFS.find(d=>d.key===key);
+  params[key]=Math.max(def.min,Math.min(def.max,Math.round(val)));
+  syncUI(key);
+}
+function syncUI(key){
+  ['d','m'].forEach(sfx=>{
+    const s=document.getElementById('s-'+key+'-'+sfx);
+    const n=document.getElementById('n-'+key+'-'+sfx);
+    if(s)s.value=params[key];if(n)n.value=params[key];
+  });
+}
+
+// ─── PRESET ACCORDIONS ───────────────────────────────────────────────────────
+function buildPresets(container){
+  PRESETS.forEach(p=>{
+    const item=document.createElement('div');
+    item.className='preset-item';item.dataset.id=p.id;
+
+    const hd=document.createElement('button');
+    hd.className='preset-hd';
+    hd.innerHTML=`<div><div class="p-name">${p.name}</div><div class="p-meta">${p.tag}</div></div><span class="p-arrow">▾</span>`;
+
+    const body=document.createElement('div');body.className='preset-body';
+    const sw=document.createElement('div');sw.className='strength-wrap';
+    sw.innerHTML=`<div class="strength-row">
+      <span class="str-label">Strength</span>
+      <input class="str-slider" type="range" min="0" max="100" value="100">
+      <span class="str-val">100%</span></div>`;
+
+    const strSl=sw.querySelector('.str-slider');
+    const strVl=sw.querySelector('.str-val');
+    strSl.addEventListener('input',()=>{
+      presetStr=+strSl.value;strVl.textContent=presetStr+'%';
+      syncStrength(p.id,presetStr);
+      if(activePreset===p.id) applyStrength(p,presetStr);
+    });
+
+    body.appendChild(sw);item.append(hd,body);container.appendChild(item);
+
+    hd.addEventListener('click',()=>{
+      const wasOpen=item.classList.contains('active');
+      document.querySelectorAll('.preset-item').forEach(i=>i.classList.remove('active'));
+      if(!wasOpen){
+        document.querySelectorAll(`.preset-item[data-id="${p.id}"]`).forEach(i=>i.classList.add('active'));
+        activePreset=p.id;presetStr=100;
+        syncStrength(p.id,100);applyStrength(p,100);
+        document.getElementById('film-info').innerHTML=`<em>${p.name}</em> &nbsp;·&nbsp; ${p.desc}`;
+      } else {activePreset=null;}
+    });
+  });
+}
+buildPresets(document.getElementById('preset-list-d'));
+buildPresets(document.getElementById('preset-list-m'));
+
+function syncStrength(id,val){
+  document.querySelectorAll(`.preset-item[data-id="${id}"] .str-slider`).forEach(sl=>{
+    sl.value=val;sl.closest('.strength-wrap').querySelector('.str-val').textContent=val+'%';
+  });
+}
+function applyStrength(p,str){
+  const t=str/100;
+  ALL_DEFS.forEach(d=>setCtrl(d.key,Math.round(d.def+((p.params[d.key]??d.def)-d.def)*t)));
+  schedRender();
+}
+
+// ─── RESET ───────────────────────────────────────────────────────────────────
+function resetAll(){
+  activePreset=null;
+  document.querySelectorAll('.preset-item').forEach(i=>i.classList.remove('active'));
+  ALL_DEFS.forEach(d=>setCtrl(d.key,d.def));
+  document.getElementById('film-info').innerHTML='No preset selected';
+  schedRender();
+}
+document.getElementById('reset-btn-d').addEventListener('click',resetAll);
+document.getElementById('reset-btn-m').addEventListener('click',resetAll);
+
+// ─── OPEN PHOTO ──────────────────────────────────────────────────────────────
+// Never clears the canvas — just opens file picker. Image swaps on load.
+document.getElementById('open-photo-btn').addEventListener('click',()=>{
+  const fi=document.getElementById('file-input');
+  fi.value='';fi.click();
+});
+
+// ─── VIEW TOGGLE ─────────────────────────────────────────────────────────────
+document.getElementById('btn-after').addEventListener('click',()=>{
+  outCanvas.style.opacity='1';
+  document.getElementById('btn-after').classList.add('active');
+  document.getElementById('btn-before').classList.remove('active');
+});
+document.getElementById('btn-before').addEventListener('click',()=>{
+  outCanvas.style.opacity='0';
+  document.getElementById('btn-before').classList.add('active');
+  document.getElementById('btn-after').classList.remove('active');
+});
+
+// ─── ZOOM ─────────────────────────────────────────────────────────────────────
+document.getElementById('zoom-in').addEventListener('click',()=>{
+  const i=ZOOM_STEPS.findIndex(z=>z>zoomLevel+.001);
+  if(i!==-1){zoomLevel=ZOOM_STEPS[i];applyZoom();}
+});
+document.getElementById('zoom-out').addEventListener('click',()=>{
+  const r=[...ZOOM_STEPS].reverse(),i=r.findIndex(z=>z<zoomLevel-.001);
+  if(i!==-1){zoomLevel=r[i];applyZoom();}
+});
+vp.addEventListener('dblclick',e=>{
+  if(e.target===vp||e.target===wrap||e.target===outCanvas||e.target===origCanvas)
+  {zoomLevel=1.0;applyZoom();}
+});
+function applyZoom(){
+  wrap.style.transform=`scale(${zoomLevel})`;
+  document.getElementById('zoom-level').textContent=Math.round(zoomLevel*100)+'%';
+}
+function fitCanvas(){
+  if(!imageLoaded)return;
+  const pad=20,aw=vp.clientWidth-pad*2,ah=vp.clientHeight-pad*2;
+  const sc=Math.min(aw/origCanvas.width,ah/origCanvas.height,1);
+  origCanvas.style.width=Math.round(origCanvas.width*sc)+'px';
+  origCanvas.style.height='auto';
+  applyZoom();
+}
+window.addEventListener('resize',fitCanvas);
+
+// ─── MOBILE SHEET ─────────────────────────────────────────────────────────────
+const mobSheet=document.getElementById('mob-sheet');
+const collapseBtn=document.getElementById('mob-collapse-btn');
+
+function isMob(){return window.innerWidth<=768;}
+
+function setSheetCollapsed(collapsed){
+  sheetCollapsed=collapsed;
+  mobSheet.classList.toggle('collapsed',collapsed);
+  collapseBtn.textContent=collapsed?'Show':'Hide';
+}
+
+collapseBtn.addEventListener('click',e=>{
+  e.stopPropagation();
+  setSheetCollapsed(!sheetCollapsed);
+});
+
+// Tapping the pill also toggles
+document.getElementById('mob-pill').addEventListener('click',()=>{
+  setSheetCollapsed(!sheetCollapsed);
+});
+
+// Tabs
+document.querySelectorAll('.mob-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.mob-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const tgt=tab.dataset.tab;
+    document.getElementById('mob-panel-presets').classList.toggle('active',tgt==='presets');
+    document.getElementById('mob-panel-controls').classList.toggle('active',tgt==='controls');
+    // Ensure sheet is open when switching tabs
+    if(sheetCollapsed) setSheetCollapsed(false);
+  });
+});
+
+// ─── FOCUS MODE ───────────────────────────────────────────────────────────────
+let focusTimer;
+
+function enterFocus(activeRow){
+  clearTimeout(focusTimer);
+  // Mark the row as focused
+  document.querySelectorAll('.ctrl-row').forEach(r=>r.classList.remove('focused'));
+  activeRow.classList.add('focused');
+  // Activate focus mode
+  document.body.classList.add('focus-mode');
+}
+
+function exitFocus(){
+  clearTimeout(focusTimer);
+  focusTimer=setTimeout(()=>{
+    document.body.classList.remove('focus-mode');
+    document.querySelectorAll('.ctrl-row').forEach(r=>r.classList.remove('focused'));
+  },500);
+}
+
+// ─── UPLOAD ───────────────────────────────────────────────────────────────────
+const uploadZone=document.getElementById('upload-zone');
+const fileInput=document.getElementById('file-input');
+
+uploadZone.addEventListener('click',()=>fileInput.click());
+uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('drag-over')});
+uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop',e=>{
+  e.preventDefault();uploadZone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImage(f);
+});
+fileInput.addEventListener('change',e=>{if(e.target.files[0])loadImage(e.target.files[0])});
+
+function loadImage(file){
+  const r=new FileReader();
+  r.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=2400;let W=img.width,H=img.height;
+      if(W>MAX){H=Math.round(H*MAX/W);W=MAX;}
+      if(H>MAX){W=Math.round(W*MAX/H);H=MAX;}
+      origCanvas.width=outCanvas.width=W;
+      origCanvas.height=outCanvas.height=H;
+      origCtx.drawImage(img,0,0,W,H);
+      imageLoaded=true;zoomLevel=1.0;
+      uploadZone.style.display='none';
+      wrap.classList.add('visible');
+      document.getElementById('top-bar').classList.add('visible');
+      document.getElementById('film-strip').classList.add('visible');
+      document.getElementById('save-btn-d').disabled=false;
+      document.getElementById('save-btn-m').disabled=false;
+      fitCanvas();schedRender();
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function schedRender(){if(!imageLoaded)return;clearTimeout(debTimer);debTimer=setTimeout(render,55);}
+
+function render(){
+  if(!imageLoaded||processing)return;
+  processing=true;
+  const ds=document.getElementById('dev-status');
+  ds.classList.remove('show','hide');void ds.offsetWidth;ds.classList.add('show');
+
+  requestAnimationFrame(()=>setTimeout(()=>{
+    const W=origCanvas.width,H=origCanvas.height;
+    outCtx.clearRect(0,0,W,H);outCtx.drawImage(origCanvas,0,0);
+    const p=params;
+
+    // 1. TONE
+    const imgd=outCtx.getImageData(0,0,W,H),px=imgd.data;
+    const expF=p.exposure/100,conF=p.contrast/100;
+    const hiF=p.highlights/100,shF=p.shadows/100;
+    const satF=p.saturation/100,tempF=p.temperature/100;
+
+    const LUT=new Uint8Array(256);
+    for(let v=0;v<256;v++){
+      let n=v/255;
+      n=Math.pow(2,expF*2)*n;
+      if(conF!==0) n=clamp01(n+conF*1.5*4*n*(1-n)*(n-0.5));
+      const hiM=Math.max(0,(n-0.5)*2);n=clamp01(n+hiF*0.36*hiM*hiM);
+      const shM=Math.max(0,(0.5-n)*2);n=clamp01(n+shF*0.36*shM*shM);
+      LUT[v]=Math.round(clamp01(n)*255);
+    }
+    const tR=Math.round(tempF*20),tB=Math.round(tempF*-16);
+    for(let i=0;i<px.length;i+=4){
+      let r=LUT[px[i]],g=LUT[px[i+1]],b=LUT[px[i+2]];
+      r=clamp(r+tR);b=clamp(b+tB);
+      const lum=Math.round(0.299*r+0.587*g+0.114*b);
+      r=clamp(lum+(r-lum)*(1+satF));
+      g=clamp(lum+(g-lum)*(1+satF));
+      b=clamp(lum+(b-lum)*(1+satF));
+      px[i]=r;px[i+1]=g;px[i+2]=b;
+    }
+    outCtx.putImageData(imgd,0,0);
+
+    // 2. VIGNETTE
+    if(p.vignette>0){
+      const s=p.vignette/100;
+      const cx=W/2,cy=H/2,rad=Math.sqrt(cx*cx+cy*cy)*1.05;
+      const vg=outCtx.createRadialGradient(cx,cy,rad*0.25,cx,cy,rad);
+      vg.addColorStop(0,'rgba(0,0,0,0)');
+      vg.addColorStop(0.6,'rgba(0,0,0,'+(s*0.36).toFixed(3)+')');
+      vg.addColorStop(1,'rgba(0,0,0,'+(s*0.86).toFixed(3)+')');
+      outCtx.fillStyle=vg;outCtx.fillRect(0,0,W,H);
+    }
+
+    // 3. BLOOM
+    if(p.bloom>0){
+      const s=p.bloom/100;
+      const sw=Math.max(1,Math.floor(W/10)),sh=Math.max(1,Math.floor(H/10));
+      const small=document.createElement('canvas');small.width=sw;small.height=sh;
+      small.getContext('2d').drawImage(outCtx.canvas,0,0,sw,sh);
+      outCtx.globalAlpha=s*0.22;
+      outCtx.globalCompositeOperation='screen';
+      outCtx.drawImage(small,0,0,W,H);
+      outCtx.globalAlpha=1;outCtx.globalCompositeOperation='source-over';
+    }
+
+    // 4. GRAIN
+    if(p.grain>0){
+      const amount=p.grain*0.82;
+      const gi=outCtx.getImageData(0,0,W,H),gp=gi.data;
+      for(let i=0;i<gp.length;i+=4){
+        const lum=(gp[i]+gp[i+1]+gp[i+2])/765;
+        const lumMask=1-Math.pow(lum,1.6)*0.55;
+        const base=amount*lumMask;
+        gp[i]  =clamp(gp[i]  +(Math.random()-.5)*base*1.08);
+        gp[i+1]=clamp(gp[i+1]+(Math.random()-.5)*base*0.96);
+        gp[i+2]=clamp(gp[i+2]+(Math.random()-.5)*base*1.12);
+      }
+      outCtx.putImageData(gi,0,0);
+    }
+
+    ds.classList.remove('show');ds.classList.add('hide');
+    processing=false;
+  },16));
+}
+
+function clamp(v)  {return Math.max(0,Math.min(255,Math.round(v)))}
+function clamp01(v){return Math.max(0,Math.min(1,v))}
+
+// ─── SAVE ─────────────────────────────────────────────────────────────────────
+function doSave(){
+  if(!imageLoaded)return;
+  const W=outCanvas.width,H=outCanvas.height;
+  const exp=document.createElement('canvas');exp.width=W;exp.height=H;
+  const ec=exp.getContext('2d');ec.fillStyle='#fff';ec.fillRect(0,0,W,H);
+  ec.drawImage(outCanvas,0,0,W,H);
+  exp.toBlob(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`grain-${activePreset||'custom'}-${Date.now()}.jpg`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  },'image/jpeg',0.95);
+}
+document.getElementById('save-btn-d').addEventListener('click',doSave);
+document.getElementById('save-btn-m').addEventListener('click',doSave);
+</script>
+</body>
+</html>
